@@ -19,7 +19,7 @@ class TokenBotAPI:
             
             async with aiohttp.ClientSession() as session:
                 async with session.post(
-                    f"{self.api_url}/api/process",
+                    self.api_url,  # ✅ Fixed - direct URL
                     json=payload,
                     timeout=aiohttp.ClientTimeout(total=self.timeout)
                 ) as response:
@@ -46,9 +46,12 @@ class TokenBotAPI:
             if not self.api_url:
                 return False
                 
+            # Convert /api/process to /health
+            health_url = self.api_url.replace('/api/process', '/health')
+                
             async with aiohttp.ClientSession() as session:
                 async with session.get(
-                    f"{self.api_url}/health",
+                    health_url,  # ✅ Fixed
                     timeout=aiohttp.ClientTimeout(total=10)
                 ) as response:
                     return response.status == 200
