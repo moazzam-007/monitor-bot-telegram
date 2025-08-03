@@ -25,6 +25,8 @@ AMAZON_PATTERNS = [
 
 def extract_amazon_urls(text):
     """Extract all Amazon URLs from text"""
+    if not text:
+        return []
     urls = []
     for pattern in AMAZON_PATTERNS:
         matches = re.findall(pattern, text, re.IGNORECASE)
@@ -52,15 +54,23 @@ def extract_message_data(message):
 
     return data
 
-# Main handler for ALL channels and ALL message types
-@Client.on_message(filters.chat(Config.CHANNELS))
-async def universal_monitor(client, message):
-    """Universal handler for ALL configured channels"""
+# Universal message handler - monitors ALL messages
+@Client.on_message()
+async def universal_message_monitor(client, message):
+    """Monitor ALL messages and filter for configured channels"""
     try:
-        channel_title = getattr(message.chat, 'title', 'Unknown')
+        # Skip if no chat info
+        if not hasattr(message, 'chat') or not message.chat:
+            return
+            
         channel_id = message.chat.id
-
-        logger.info(f"🎯 MESSAGE RECEIVED from {channel_title} ({channel_id})")
+        channel_title = getattr(message.chat, 'title', 'Unknown')
+        
+        # Only process configured channels
+        if channel_id not in Config.CHANNELS:
+            return
+            
+        logger.info(f"🎯 MESSAGE from CONFIGURED CHANNEL: {channel_title} ({channel_id})")
 
         # Extract text from any message type (including forwarded)
         text_content = ""
@@ -68,10 +78,8 @@ async def universal_monitor(client, message):
             text_content = message.text
         elif message.caption:
             text_content = message.caption
-        else:
-            # Skip non-text messages
-            return
-
+        
+        # Skip if no text or too short
         if not text_content or len(text_content) < 10:
             return
 
@@ -104,7 +112,7 @@ async def universal_monitor(client, message):
                 if response and response.get("status") == "success":
                     logger.info(f"✅ SUCCESS: {url} from {channel_title}")
                 elif response and response.get("status") == "duplicate":
-                    logger.info(f"🔄 DUPLICATE: {url} from {channel_title}")
+                    logger.info(f"🔄 DUPLICATE: {url} from {channel_title}") 
                 else:
                     logger.error(f"❌ FAILED: {url} from {channel_title} - {response}")
 
@@ -115,11 +123,3 @@ async def universal_monitor(client, message):
         logger.error(f"❌ Universal monitor error: {e}")
         import traceback
         logger.error(f"❌ Traceback: {traceback.format_exc()}")
-
-# Simple test handler to log all channel activity
-@Client.on_message(filters.all)
-async def channel_activity_log(client, message):
-    """Log activity from all channels"""
-    if message.chat.id in Config.CHANNELS:
-        channel_title = getattr(message.chat, 'title', 'Unknown')
-        logger.info(f"📊 ACTIVITY: {channel_title} ({message.chat.id}) - Message type: {message.media or 'text'}")
