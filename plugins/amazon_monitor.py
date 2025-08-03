@@ -100,13 +100,6 @@ async def monitor_amazon_links(client, message):
                 
                 if response and response.get("status") == "success":
                     logger.info(f"✅ Successfully processed: {url}")
-                    
-                    # Log to group if configured
-                    if Config.LOG_GROUP_ID:
-                        await client.send_message(
-                            chat_id=Config.LOG_GROUP_ID,
-                            text=f"✅ Processed: {url}\n📊 Status: {response.get('message', 'Success')}"
-                        )
                         
                 elif response and response.get("status") == "duplicate":
                     logger.info(f"🔄 Duplicate link skipped: {url}")
@@ -119,16 +112,6 @@ async def monitor_amazon_links(client, message):
                 logger.error(f"❌ Error processing URL {url}: {str(e)}")
                 import traceback
                 logger.error(f"❌ Full traceback: {traceback.format_exc()}")
-                
-                # Log error to group if configured
-                if Config.LOG_GROUP_ID:
-                    try:
-                        await client.send_message(
-                            chat_id=Config.LOG_GROUP_ID,
-                            text=f"❌ Error processing: {url}\n🔴 Error: {str(e)}"
-                        )
-                    except:
-                        pass
     
     except Exception as e:
         logger.error(f"❌ Monitor function error: {str(e)}")
