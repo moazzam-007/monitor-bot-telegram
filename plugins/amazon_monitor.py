@@ -45,16 +45,18 @@ def extract_message_data(message):
         }
     }
 
-    # Extract images
+    # Extract images - send file_id only if valid
     if message.photo:
-        data["images"].append({
-            "file_id": message.photo.file_id,
-            "file_size": message.photo.file_size
-        })
+        # Only include if file_id is valid format
+        if hasattr(message.photo, 'file_id') and message.photo.file_id:
+            data["images"].append({
+                "file_id": message.photo.file_id,
+                "file_size": getattr(message.photo, 'file_size', 0)
+            })
 
     return data
 
-# Universal message handler - monitors ALL messages
+# Universal message handler - monitors ALL messages without filters
 @Client.on_message()
 async def universal_message_monitor(client, message):
     """Monitor ALL messages and filter for configured channels"""
@@ -65,6 +67,10 @@ async def universal_message_monitor(client, message):
             
         channel_id = message.chat.id
         channel_title = getattr(message.chat, 'title', 'Unknown')
+        
+        # Debug: Log activity from all channels (every 20th message to reduce spam)
+        if message.id % 20 == 0:
+            logger.info(f"🔍 ACTIVITY: {channel_title} ({channel_id}) - {'✅ CONFIGURED' if channel_id in Config.CHANNELS else '❌ NOT CONFIGURED'}")
         
         # Only process configured channels
         if channel_id not in Config.CHANNELS:
