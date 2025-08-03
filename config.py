@@ -7,20 +7,16 @@ class Config:
     PHONE_NUMBER = os.environ.get("PHONE_NUMBER")
     STRING_SESSION = os.environ.get("STRING_SESSION")
     
-    # Monitoring Configuration - FIXED
-    channels_str = os.environ.get("CHANNELS", "")
-    CHANNELS = [
-        int(channel_id.strip()) 
-        for channel_id in channels_str.split(",") 
-        if channel_id.strip()
-    ]
+    # Monitoring Configuration
+    CHANNELS_STR = os.environ.get("CHANNELS", "")
+    CHANNELS = [x.strip() for x in CHANNELS_STR.split(',') if x.strip()] # <-- FIX
     
     # Token Bot API Configuration
-    TOKEN_BOT_API_URL = os.environ.get("TOKEN_BOT_API_URL")  # Token bot API endpoint
-    API_TIMEOUT = int(os.environ.get("API_TIMEOUT", "30"))  # API timeout in seconds
+    TOKEN_BOT_API_URL = os.environ.get("TOKEN_BOT_API_URL")
+    API_TIMEOUT = int(os.environ.get("API_TIMEOUT", "30"))
     
     # Logging Configuration
-    LOG_GROUP_ID = os.environ.get("LOG_GROUP_ID")  # Optional logging group
+    LOG_GROUP_ID = os.environ.get("LOG_GROUP_ID")
     
     # Debug Mode
     DEBUG_MODE = os.environ.get("DEBUG_MODE", "False").lower() == "true"
