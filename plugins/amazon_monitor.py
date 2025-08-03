@@ -70,11 +70,10 @@ async def monitor_amazon_links(client, message):
         
         # Check for Amazon URLs
         amazon_urls = extract_amazon_urls(text_content)
-        
         if not amazon_urls:
             logger.info("❌ No Amazon links found")
             return  # No Amazon links found
-        
+            
         logger.info(f"🔍 Found {len(amazon_urls)} Amazon link(s): {amazon_urls}")
         
         # Extract message data
@@ -100,10 +99,8 @@ async def monitor_amazon_links(client, message):
                 
                 if response and response.get("status") == "success":
                     logger.info(f"✅ Successfully processed: {url}")
-                        
                 elif response and response.get("status") == "duplicate":
                     logger.info(f"🔄 Duplicate link skipped: {url}")
-                    
                 else:
                     logger.error(f"❌ Failed to process: {url}")
                     logger.error(f"❌ Response: {response}")
@@ -112,7 +109,7 @@ async def monitor_amazon_links(client, message):
                 logger.error(f"❌ Error processing URL {url}: {str(e)}")
                 import traceback
                 logger.error(f"❌ Full traceback: {traceback.format_exc()}")
-    
+                
     except Exception as e:
         logger.error(f"❌ Monitor function error: {str(e)}")
         import traceback
