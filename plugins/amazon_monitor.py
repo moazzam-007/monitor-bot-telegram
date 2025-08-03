@@ -1,6 +1,8 @@
+import asyncio
 from pyrogram import Client, filters
 from config import Config
 from services.api_client import TokenBotAPI
+from services.duplicate_detector import DuplicateDetector # <-- NEW
 import re
 import logging
 
@@ -10,6 +12,9 @@ logger = logging.getLogger(__name__)
 
 # Initialize API client
 token_bot_api = TokenBotAPI()
+
+# Initialize Duplicate Detector
+duplicate_detector = DuplicateDetector(time_window_hours=24) # <-- NEW
 
 # DEBUG: Log configuration at startup
 logger.info(f"🔧 DEBUG: Configured channels: {Config.CHANNELS}")
@@ -47,12 +52,19 @@ def extract_message_data(message):
 
     # Extract images - send file_id only if valid
     if message.photo:
-        # Only include if file_id is valid format
         if hasattr(message.photo, 'file_id') and message.photo.file_id:
             data["images"].append({
                 "file_id": message.photo.file_id,
                 "file_size": getattr(message.photo, 'file_size', 0)
             })
+    
+    # Handle media groups (multiple images)
+    if message.media_group_id:
+        # NOTE: Pyrogram's `on_message` handler doesn't get all group images at once.
+        # This will only process the first image in a group. For full support, 
+        # a more complex handler or a different library might be needed.
+        # However, for our purposes, processing the first image is sufficient for now.
+        pass
 
     return data
 
@@ -64,28 +76,20 @@ async def universal_message_monitor(client, message):
         # Skip if no chat info
         if not hasattr(message, 'chat') or not message.chat:
             return
-            
+        
         channel_id = message.chat.id
         channel_title = getattr(message.chat, 'title', 'Unknown')
-        
-        # Debug: Log activity from all channels (every 20th message to reduce spam)
-        if message.id % 20 == 0:
-            logger.info(f"🔍 ACTIVITY: {channel_title} ({channel_id}) - {'✅ CONFIGURED' if channel_id in Config.CHANNELS else '❌ NOT CONFIGURED'}")
-        
-        # Only process configured channels
-        if channel_id not in Config.CHANNELS:
+
+        # Check if the channel is in our configured list
+        # Note: Config.CHANNELS will be a list of strings, so we must match the type
+        if str(channel_id) not in Config.CHANNELS:
             return
             
         logger.info(f"🎯 MESSAGE from CONFIGURED CHANNEL: {channel_title} ({channel_id})")
 
-        # Extract text from any message type (including forwarded)
-        text_content = ""
-        if message.text:
-            text_content = message.text
-        elif message.caption:
-            text_content = message.caption
+        # Extract text from any message type
+        text_content = message.caption or message.text or ""
         
-        # Skip if no text or too short
         if not text_content or len(text_content) < 10:
             return
 
@@ -98,27 +102,31 @@ async def universal_message_monitor(client, message):
 
         logger.info(f"🔍 Found {len(amazon_urls)} Amazon link(s) from {channel_title}: {amazon_urls}")
 
-        # Extract message data
-        message_data = extract_message_data(message)
-
         # Process each URL
         for url in amazon_urls:
+            # Check for duplicates before sending to API
+            if duplicate_detector.is_duplicate(url): # <-- NEW
+                logger.info(f"🔄 SKIPPING: Duplicate URL {url} from {channel_title}")
+                continue # <-- NEW
+
             try:
+                message_data = extract_message_data(message)
                 payload = {
                     "url": url,
                     "original_text": message_data["text"],
                     "images": message_data["images"],
                     "channel_info": message_data["channel_info"]
                 }
-
+                
                 logger.info(f"📤 Sending {url} to API from {channel_title}")
 
-                response = await token_bot_api.process_amazon_link(payload)
+                # API call with retry logic
+                response = await token_bot_api.process_amazon_link(payload) # <-- now with retry
 
                 if response and response.get("status") == "success":
                     logger.info(f"✅ SUCCESS: {url} from {channel_title}")
                 elif response and response.get("status") == "duplicate":
-                    logger.info(f"🔄 DUPLICATE: {url} from {channel_title}") 
+                    logger.info(f"🔄 DUPLICATE: {url} from {channel_title}")
                 else:
                     logger.error(f"❌ FAILED: {url} from {channel_title} - {response}")
 
