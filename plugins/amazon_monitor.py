@@ -58,27 +58,15 @@ def extract_message_data(message):
     
     return data
 
-# DEBUG: Add handler for all messages (temporary testing)
-@Client.on_message()
-async def debug_all_messages(client, message):
-    """Debug handler to catch all messages"""
-    if Config.DEBUG_MODE:
-        logger.info(f"🐛 ALL MESSAGES: From {message.chat.id} ({getattr(message.chat, 'title', 'Unknown')})")
-        if message.text:
-            logger.info(f"🐛 TEXT: {message.text[:100]}...")
-
-@Client.on_message(filters.chat(Config.CHANNELS) & (filters.text | filters.caption))
+@Client.on_message(filters.chat(Config.CHANNELS) & filters.text)
 async def monitor_amazon_links(client, message):
-    """Main monitoring function"""
+    """Main monitoring function - FIXED VERSION"""
     try:
-        logger.info(f"📨 DEBUG: Received message from {getattr(message.chat, 'title', 'Unknown')} ({message.chat.id})")
-        
-        if Config.DEBUG_MODE:
-            logger.info(f"📨 Monitoring message from {message.chat.title}")
+        logger.info(f"🎯 MAIN HANDLER TRIGGERED! From {getattr(message.chat, 'title', 'Unknown')} ({message.chat.id})")
         
         # Extract text content
-        text_content = message.caption or message.text or ""
-        logger.info(f"📝 DEBUG: Message text: {text_content[:100]}...")
+        text_content = message.text or ""
+        logger.info(f"📝 Message text: {text_content[:100]}...")
         
         # Check for Amazon URLs
         amazon_urls = extract_amazon_urls(text_content)
@@ -104,8 +92,11 @@ async def monitor_amazon_links(client, message):
                 }
                 
                 # Send to Token Bot API
-                logger.info(f"📤 Sending to Token Bot: {url[:50]}...")
+                logger.info(f"📤 Sending to Token Bot API: {Config.TOKEN_BOT_API_URL}")
+                logger.info(f"📤 URL: {url[:50]}...")
+                
                 response = await token_bot_api.process_amazon_link(payload)
+                logger.info(f"📥 API Response: {response}")
                 
                 if response and response.get("status") == "success":
                     logger.info(f"✅ Successfully processed: {url}")
@@ -125,14 +116,27 @@ async def monitor_amazon_links(client, message):
                     logger.error(f"❌ Response: {response}")
                     
             except Exception as e:
-                logger.error(f"❌ Error processing URL {url}: {e}")
+                logger.error(f"❌ Error processing URL {url}: {str(e)}")
+                import traceback
+                logger.error(f"❌ Full traceback: {traceback.format_exc()}")
                 
                 # Log error to group if configured
                 if Config.LOG_GROUP_ID:
-                    await client.send_message(
-                        chat_id=Config.LOG_GROUP_ID,
-                        text=f"❌ Error processing: {url}\n🔴 Error: {str(e)}"
-                    )
+                    try:
+                        await client.send_message(
+                            chat_id=Config.LOG_GROUP_ID,
+                            text=f"❌ Error processing: {url}\n🔴 Error: {str(e)}"
+                        )
+                    except:
+                        pass
     
     except Exception as e:
-        logger.error(f"❌ Monitor function error: {e}")
+        logger.error(f"❌ Monitor function error: {str(e)}")
+        import traceback
+        logger.error(f"❌ Full traceback: {traceback.format_exc()}")
+
+# Simple test handler to verify filters work
+@Client.on_message(filters.chat(Config.CHANNELS))
+async def test_channel_filter(client, message):
+    """Test if channel filter is working"""
+    logger.info(f"✅ CHANNEL FILTER WORKS! Message from: {message.chat.id}")
