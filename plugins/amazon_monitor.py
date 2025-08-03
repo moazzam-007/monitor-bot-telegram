@@ -51,27 +51,39 @@ def extract_message_data(message):
             "file_size": message.photo.file_size
         })
     
-    # Extract media group (multiple images)
-    if hasattr(message, 'media_group_id') and message.media_group_id:
-        # This will be handled by pyrogram's collect_related_messages
-        pass
-    
     return data
 
-@Client.on_message(filters.chat(Config.CHANNELS) & filters.text)
+# FIXED: Use single handler for ALL message types from ALL channels
+@Client.on_message(filters.chat(Config.CHANNELS))
 async def monitor_amazon_links(client, message):
-    """Main monitoring function - FIXED VERSION"""
+    """Monitor ALL channels for Amazon links - UNIVERSAL HANDLER"""
     try:
-        logger.info(f"🎯 MAIN HANDLER TRIGGERED! From {getattr(message.chat, 'title', 'Unknown')} ({message.chat.id})")
+        logger.info(f"🎯 UNIVERSAL HANDLER! From {getattr(message.chat, 'title', 'Unknown')} ({message.chat.id})")
         
-        # Extract text content
-        text_content = message.text or ""
+        # Extract text content from all message types
+        text_content = ""
+        if message.text:
+            text_content = message.text
+        elif message.caption:
+            text_content = message.caption
+        elif hasattr(message, 'document') and message.document:
+            # Skip document messages
+            return
+        elif hasattr(message, 'video') and message.video:
+            # Skip video messages without caption
+            return
+        else:
+            # Skip other message types
+            return
+            
+        if not text_content:
+            return
+            
         logger.info(f"📝 Message text: {text_content[:100]}...")
         
         # Check for Amazon URLs
         amazon_urls = extract_amazon_urls(text_content)
         if not amazon_urls:
-            logger.info("❌ No Amazon links found")
             return  # No Amazon links found
             
         logger.info(f"🔍 Found {len(amazon_urls)} Amazon link(s): {amazon_urls}")
@@ -114,9 +126,3 @@ async def monitor_amazon_links(client, message):
         logger.error(f"❌ Monitor function error: {str(e)}")
         import traceback
         logger.error(f"❌ Full traceback: {traceback.format_exc()}")
-
-# Simple test handler to verify filters work
-@Client.on_message(filters.chat(Config.CHANNELS))
-async def test_channel_filter(client, message):
-    """Test if channel filter is working"""
-    logger.info(f"✅ CHANNEL FILTER WORKS! Message from: {message.chat.id}")
