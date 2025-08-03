@@ -7,8 +7,13 @@ class Config:
     PHONE_NUMBER = os.environ.get("PHONE_NUMBER")
     STRING_SESSION = os.environ.get("STRING_SESSION")
     
-    # Monitoring Configuration
-    CHANNELS = os.environ.get("CHANNELS", "").split(",")  # Comma separated channel IDs
+    # Monitoring Configuration - FIXED
+    channels_str = os.environ.get("CHANNELS", "")
+    CHANNELS = [
+        int(channel_id.strip()) 
+        for channel_id in channels_str.split(",") 
+        if channel_id.strip()
+    ]
     
     # Token Bot API Configuration
     TOKEN_BOT_API_URL = os.environ.get("TOKEN_BOT_API_URL")  # Token bot API endpoint
