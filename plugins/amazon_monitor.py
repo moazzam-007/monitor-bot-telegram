@@ -42,14 +42,14 @@ def extract_message_data(message):
             "channel_title": getattr(message.chat, 'title', 'Unknown')
         }
     }
-    
+
     # Extract images
     if message.photo:
         data["images"].append({
             "file_id": message.photo.file_id,
             "file_size": message.photo.file_size
         })
-    
+
     return data
 
 # Main handler for ALL channels and ALL message types
@@ -59,10 +59,10 @@ async def universal_monitor(client, message):
     try:
         channel_title = getattr(message.chat, 'title', 'Unknown')
         channel_id = message.chat.id
-        
+
         logger.info(f"🎯 MESSAGE RECEIVED from {channel_title} ({channel_id})")
-        
-        # Extract text from any message type
+
+        # Extract text from any message type (including forwarded)
         text_content = ""
         if message.text:
             text_content = message.text
@@ -71,22 +71,22 @@ async def universal_monitor(client, message):
         else:
             # Skip non-text messages
             return
-            
+
         if not text_content or len(text_content) < 10:
             return
-            
+
         logger.info(f"📝 Text: {text_content[:100]}...")
-        
+
         # Check for Amazon URLs
         amazon_urls = extract_amazon_urls(text_content)
         if not amazon_urls:
             return
-            
+
         logger.info(f"🔍 Found {len(amazon_urls)} Amazon link(s) from {channel_title}: {amazon_urls}")
-        
+
         # Extract message data
         message_data = extract_message_data(message)
-        
+
         # Process each URL
         for url in amazon_urls:
             try:
@@ -96,21 +96,21 @@ async def universal_monitor(client, message):
                     "images": message_data["images"],
                     "channel_info": message_data["channel_info"]
                 }
-                
+
                 logger.info(f"📤 Sending {url} to API from {channel_title}")
-                
+
                 response = await token_bot_api.process_amazon_link(payload)
-                
+
                 if response and response.get("status") == "success":
                     logger.info(f"✅ SUCCESS: {url} from {channel_title}")
                 elif response and response.get("status") == "duplicate":
                     logger.info(f"🔄 DUPLICATE: {url} from {channel_title}")
                 else:
                     logger.error(f"❌ FAILED: {url} from {channel_title} - {response}")
-                    
+
             except Exception as e:
                 logger.error(f"❌ Error processing {url} from {channel_title}: {e}")
-                
+
     except Exception as e:
         logger.error(f"❌ Universal monitor error: {e}")
         import traceback
