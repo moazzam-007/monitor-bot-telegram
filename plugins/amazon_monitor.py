@@ -13,9 +13,8 @@ token_bot_api = TokenBotAPI()
 
 # DEBUG: Log configuration at startup
 logger.info(f"🔧 DEBUG: Configured channels: {Config.CHANNELS}")
-logger.info(f"🔧 DEBUG: Channel types: {[type(ch) for ch in Config.CHANNELS]}")
+logger.info(f"🔧 DEBUG: Total channels: {len(Config.CHANNELS)}")
 logger.info(f"🔧 DEBUG: API URL: {Config.TOKEN_BOT_API_URL}")
-logger.info(f"🔧 DEBUG: Debug mode: {Config.DEBUG_MODE}")
 
 # Amazon URL patterns
 AMAZON_PATTERNS = [
@@ -30,7 +29,7 @@ def extract_amazon_urls(text):
     for pattern in AMAZON_PATTERNS:
         matches = re.findall(pattern, text, re.IGNORECASE)
         urls.extend(matches)
-    return list(set(urls))  # Remove duplicates
+    return list(set(urls))
 
 def extract_message_data(message):
     """Extract all relevant data from message"""
@@ -53,48 +52,44 @@ def extract_message_data(message):
     
     return data
 
-# FIXED: Use single handler for ALL message types from ALL channels
+# Main handler for ALL channels and ALL message types
 @Client.on_message(filters.chat(Config.CHANNELS))
-async def monitor_amazon_links(client, message):
-    """Monitor ALL channels for Amazon links - UNIVERSAL HANDLER"""
+async def universal_monitor(client, message):
+    """Universal handler for ALL configured channels"""
     try:
-        logger.info(f"🎯 UNIVERSAL HANDLER! From {getattr(message.chat, 'title', 'Unknown')} ({message.chat.id})")
+        channel_title = getattr(message.chat, 'title', 'Unknown')
+        channel_id = message.chat.id
         
-        # Extract text content from all message types
+        logger.info(f"🎯 MESSAGE RECEIVED from {channel_title} ({channel_id})")
+        
+        # Extract text from any message type
         text_content = ""
         if message.text:
             text_content = message.text
         elif message.caption:
             text_content = message.caption
-        elif hasattr(message, 'document') and message.document:
-            # Skip document messages
-            return
-        elif hasattr(message, 'video') and message.video:
-            # Skip video messages without caption
-            return
         else:
-            # Skip other message types
+            # Skip non-text messages
             return
             
-        if not text_content:
+        if not text_content or len(text_content) < 10:
             return
             
-        logger.info(f"📝 Message text: {text_content[:100]}...")
+        logger.info(f"📝 Text: {text_content[:100]}...")
         
         # Check for Amazon URLs
         amazon_urls = extract_amazon_urls(text_content)
         if not amazon_urls:
-            return  # No Amazon links found
+            return
             
-        logger.info(f"🔍 Found {len(amazon_urls)} Amazon link(s): {amazon_urls}")
+        logger.info(f"🔍 Found {len(amazon_urls)} Amazon link(s) from {channel_title}: {amazon_urls}")
         
         # Extract message data
         message_data = extract_message_data(message)
         
-        # Process each Amazon URL
+        # Process each URL
         for url in amazon_urls:
             try:
-                # Prepare API payload
                 payload = {
                     "url": url,
                     "original_text": message_data["text"],
@@ -102,27 +97,29 @@ async def monitor_amazon_links(client, message):
                     "channel_info": message_data["channel_info"]
                 }
                 
-                # Send to Token Bot API
-                logger.info(f"📤 Sending to Token Bot API: {Config.TOKEN_BOT_API_URL}")
-                logger.info(f"📤 URL: {url[:50]}...")
+                logger.info(f"📤 Sending {url} to API from {channel_title}")
                 
                 response = await token_bot_api.process_amazon_link(payload)
-                logger.info(f"📥 API Response: {response}")
                 
                 if response and response.get("status") == "success":
-                    logger.info(f"✅ Successfully processed: {url}")
+                    logger.info(f"✅ SUCCESS: {url} from {channel_title}")
                 elif response and response.get("status") == "duplicate":
-                    logger.info(f"🔄 Duplicate link skipped: {url}")
+                    logger.info(f"🔄 DUPLICATE: {url} from {channel_title}")
                 else:
-                    logger.error(f"❌ Failed to process: {url}")
-                    logger.error(f"❌ Response: {response}")
+                    logger.error(f"❌ FAILED: {url} from {channel_title} - {response}")
                     
             except Exception as e:
-                logger.error(f"❌ Error processing URL {url}: {str(e)}")
-                import traceback
-                logger.error(f"❌ Full traceback: {traceback.format_exc()}")
+                logger.error(f"❌ Error processing {url} from {channel_title}: {e}")
                 
     except Exception as e:
-        logger.error(f"❌ Monitor function error: {str(e)}")
+        logger.error(f"❌ Universal monitor error: {e}")
         import traceback
-        logger.error(f"❌ Full traceback: {traceback.format_exc()}")
+        logger.error(f"❌ Traceback: {traceback.format_exc()}")
+
+# Simple test handler to log all channel activity
+@Client.on_message(filters.all)
+async def channel_activity_log(client, message):
+    """Log activity from all channels"""
+    if message.chat.id in Config.CHANNELS:
+        channel_title = getattr(message.chat, 'title', 'Unknown')
+        logger.info(f"📊 ACTIVITY: {channel_title} ({message.chat.id}) - Message type: {message.media or 'text'}")
