@@ -2,7 +2,7 @@ import asyncio
 from pyrogram import Client, filters
 from config import Config
 from services.api_client import TokenBotAPI
-from services.duplicate_detector import DuplicateDetector # <-- NEW
+from services.duplicate_detector import DuplicateDetector 
 import re
 import logging
 
@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 token_bot_api = TokenBotAPI()
 
 # Initialize Duplicate Detector
-duplicate_detector = DuplicateDetector(time_window_hours=24) # <-- NEW
+duplicate_detector = DuplicateDetector(time_window_hours=24)
 
 # DEBUG: Log configuration at startup
 logger.info(f"🔧 DEBUG: Configured channels: {Config.CHANNELS}")
@@ -59,11 +59,9 @@ def extract_message_data(message):
             })
     
     # Handle media groups (multiple images)
+    # Pyrogram sends each photo in a media group as a separate message
+    # So this block is not strictly necessary for basic functionality
     if message.media_group_id:
-        # NOTE: Pyrogram's `on_message` handler doesn't get all group images at once.
-        # This will only process the first image in a group. For full support, 
-        # a more complex handler or a different library might be needed.
-        # However, for our purposes, processing the first image is sufficient for now.
         pass
 
     return data
@@ -82,6 +80,7 @@ async def universal_message_monitor(client, message):
 
         # Check if the channel is in our configured list
         # Note: Config.CHANNELS will be a list of strings, so we must match the type
+        # The fix is to ensure the channel IDs are properly formatted in .env file
         if str(channel_id) not in Config.CHANNELS:
             return
             
@@ -105,9 +104,11 @@ async def universal_message_monitor(client, message):
         # Process each URL
         for url in amazon_urls:
             # Check for duplicates before sending to API
-            if duplicate_detector.is_duplicate(url): # <-- NEW
+            # Note: We pass the URL without query parameters for cleaner detection
+            clean_url = url.split('?')[0].split('#')[0]
+            if duplicate_detector.is_duplicate(clean_url):
                 logger.info(f"🔄 SKIPPING: Duplicate URL {url} from {channel_title}")
-                continue # <-- NEW
+                continue
 
             try:
                 message_data = extract_message_data(message)
@@ -121,7 +122,7 @@ async def universal_message_monitor(client, message):
                 logger.info(f"📤 Sending {url} to API from {channel_title}")
 
                 # API call with retry logic
-                response = await token_bot_api.process_amazon_link(payload) # <-- now with retry
+                response = await token_bot_api.process_amazon_link(payload)
 
                 if response and response.get("status") == "success":
                     logger.info(f"✅ SUCCESS: {url} from {channel_title}")
