@@ -11,6 +11,12 @@ logger = logging.getLogger(__name__)
 # Initialize API client
 token_bot_api = TokenBotAPI()
 
+# DEBUG: Log configuration at startup
+logger.info(f"🔧 DEBUG: Configured channels: {Config.CHANNELS}")
+logger.info(f"🔧 DEBUG: Channel types: {[type(ch) for ch in Config.CHANNELS]}")
+logger.info(f"🔧 DEBUG: API URL: {Config.TOKEN_BOT_API_URL}")
+logger.info(f"🔧 DEBUG: Debug mode: {Config.DEBUG_MODE}")
+
 # Amazon URL patterns
 AMAZON_PATTERNS = [
     r'https?://(?:www\.)?amazon\.[a-z.]{2,6}/[^\s]*',
@@ -52,23 +58,36 @@ def extract_message_data(message):
     
     return data
 
-@Client.on_message(filters.chat(Config.CHANNELS) & filters.text)
+# DEBUG: Add handler for all messages (temporary testing)
+@Client.on_message()
+async def debug_all_messages(client, message):
+    """Debug handler to catch all messages"""
+    if Config.DEBUG_MODE:
+        logger.info(f"🐛 ALL MESSAGES: From {message.chat.id} ({getattr(message.chat, 'title', 'Unknown')})")
+        if message.text:
+            logger.info(f"🐛 TEXT: {message.text[:100]}...")
+
+@Client.on_message(filters.chat(Config.CHANNELS) & (filters.text | filters.caption))
 async def monitor_amazon_links(client, message):
     """Main monitoring function"""
     try:
+        logger.info(f"📨 DEBUG: Received message from {getattr(message.chat, 'title', 'Unknown')} ({message.chat.id})")
+        
         if Config.DEBUG_MODE:
             logger.info(f"📨 Monitoring message from {message.chat.title}")
         
         # Extract text content
         text_content = message.caption or message.text or ""
+        logger.info(f"📝 DEBUG: Message text: {text_content[:100]}...")
         
         # Check for Amazon URLs
         amazon_urls = extract_amazon_urls(text_content)
         
         if not amazon_urls:
+            logger.info("❌ No Amazon links found")
             return  # No Amazon links found
         
-        logger.info(f"🔍 Found {len(amazon_urls)} Amazon link(s)")
+        logger.info(f"🔍 Found {len(amazon_urls)} Amazon link(s): {amazon_urls}")
         
         # Extract message data
         message_data = extract_message_data(message)
@@ -103,6 +122,7 @@ async def monitor_amazon_links(client, message):
                     
                 else:
                     logger.error(f"❌ Failed to process: {url}")
+                    logger.error(f"❌ Response: {response}")
                     
             except Exception as e:
                 logger.error(f"❌ Error processing URL {url}: {e}")
