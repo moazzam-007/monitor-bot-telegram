@@ -2,6 +2,7 @@ import os
 import logging
 import threading
 import time
+import asyncio
 from flask import Flask, jsonify
 from pyrogram import Client
 from config import Config
@@ -51,10 +52,10 @@ def create_pyrogram_client():
         logger.error(f"❌ Error creating Pyrogram client: {e}")
         return None
 
-def run_monitor_bot():
-    """Run the monitor bot in background"""
+async def run_monitor_bot_async():
+    """Run the monitor bot asynchronously"""
     try:
-        logger.info("🚀 Starting monitor bot in background...")
+        logger.info("🚀 Starting monitor bot asynchronously...")
         
         # Client banayein
         pyrogram_client = create_pyrogram_client()
@@ -65,13 +66,29 @@ def run_monitor_bot():
             monitor_bot_status["channels_monitored"] = len(Config.CHANNELS)
             
             logger.info("✅ Starting monitor bot client...")
-            pyrogram_client.run()
+            await pyrogram_client.start()
         else:
             logger.error("❌ Client initialization failed.")
             monitor_bot_status["running"] = False
             
     except Exception as e:
         logger.error(f"❌ Monitor bot error: {e}")
+        monitor_bot_status["running"] = False
+
+def run_monitor_bot():
+    """Run the monitor bot in background with event loop"""
+    try:
+        logger.info("🚀 Starting monitor bot in background...")
+        
+        # Create a new event loop for this thread
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        
+        # Run the async function
+        loop.run_until_complete(run_monitor_bot_async())
+        
+    except Exception as e:
+        logger.error(f"❌ Monitor bot thread error: {e}")
         monitor_bot_status["running"] = False
 
 # Flask routes
