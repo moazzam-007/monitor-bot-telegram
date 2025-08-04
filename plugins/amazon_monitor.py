@@ -59,8 +59,6 @@ def extract_message_data(message):
             })
     
     # Handle media groups (multiple images)
-    # Pyrogram sends each photo in a media group as a separate message
-    # So this block is not strictly necessary for basic functionality
     if message.media_group_id:
         pass
 
@@ -78,9 +76,8 @@ async def universal_message_monitor(client, message):
         channel_id = message.chat.id
         channel_title = getattr(message.chat, 'title', 'Unknown')
 
-        # Check if the channel is in our configured list
-        # Note: Config.CHANNELS will be a list of strings, so we must match the type
-        # The fix is to ensure the channel IDs are properly formatted in .env file
+        # Check if the channel ID is in our configured list
+        # We need to convert the chat.id (int) to string
         if str(channel_id) not in Config.CHANNELS:
             return
             
@@ -104,7 +101,6 @@ async def universal_message_monitor(client, message):
         # Process each URL
         for url in amazon_urls:
             # Check for duplicates before sending to API
-            # Note: We pass the URL without query parameters for cleaner detection
             clean_url = url.split('?')[0].split('#')[0]
             if duplicate_detector.is_duplicate(clean_url):
                 logger.info(f"🔄 SKIPPING: Duplicate URL {url} from {channel_title}")
