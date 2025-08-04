@@ -1,4 +1,7 @@
 import os
+import logging
+
+logger = logging.getLogger(__name__)
 
 class Config:
     # Telegram Configuration
@@ -9,7 +12,7 @@ class Config:
     
     # Monitoring Configuration
     CHANNELS_STR = os.environ.get("CHANNELS", "")
-    CHANNELS = [x.strip() for x in CHANNELS_STR.split(',') if x.strip()] # <-- FIX
+    CHANNELS = [x.strip() for x in CHANNELS_STR.split(',') if x.strip()]
     
     # Token Bot API Configuration
     TOKEN_BOT_API_URL = os.environ.get("TOKEN_BOT_API_URL")
@@ -20,3 +23,20 @@ class Config:
     
     # Debug Mode
     DEBUG_MODE = os.environ.get("DEBUG_MODE", "False").lower() == "true"
+
+# Validate required environment variables
+required_vars = [
+    "API_ID",
+    "API_HASH",
+    "PHONE_NUMBER",
+    "STRING_SESSION",
+    "CHANNELS",
+    "TOKEN_BOT_API_URL"
+]
+
+missing_vars = [var for var in required_vars if not os.environ.get(var)]
+if missing_vars:
+    logger.error(f"❌ Missing required environment variables: {', '.join(missing_vars)}")
+    raise ValueError(f"Missing required environment variables: {', '.join(missing_vars)}")
+
+logger.info("✅ All required environment variables are set")
