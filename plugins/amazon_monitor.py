@@ -81,31 +81,40 @@ async def monitor_channel_messages(client, message):
         channel_id = message.chat.id
         channel_title = getattr(message.chat, 'title', 'Unknown')
         
-        logger.info(f"🎯 MESSAGE from CONFIGURED CHANNEL: {channel_title} ({channel_id})")
+        # DEBUG: Log all messages from configured channels
+        logger.info(f"🔍 DEBUG: Received message from {channel_title} ({channel_id})")
         
         # Extract text from any message type
         text_content = message.caption or message.text or ""
         
+        # DEBUG: Log message content
+        logger.info(f"🔍 DEBUG: Message content: {text_content[:100]}...")
+        
         if not text_content or len(text_content) < 10:
+            logger.info(f"🔍 DEBUG: Skipping message - too short or no text")
             return
             
-        logger.info(f"📝 Text: {text_content[:100]}...")
-        
         # Check for Amazon URLs
         amazon_urls = extract_amazon_urls(text_content)
+        logger.info(f"🔍 DEBUG: Found URLs: {amazon_urls}")
+        
         if not amazon_urls:
+            logger.info(f"🔍 DEBUG: No Amazon URLs found in message")
             return
             
         logger.info(f"🔍 Found {len(amazon_urls)} Amazon link(s) from {channel_title}: {amazon_urls}")
         
         # Process each URL
         for url in amazon_urls:
+            logger.info(f"🔍 DEBUG: Processing URL: {url}")
+            
             # Clean the URL for duplicate checking
             clean_url_str = clean_url(url)
+            logger.info(f"🔍 DEBUG: Cleaned URL: {clean_url_str}")
             
             # Check for duplicates before sending to API
             if duplicate_detector.is_duplicate(clean_url_str):
-                logger.info(f"🔄 SKIPPING: Duplicate URL {url} from {channel_title}")
+                logger.info(f"🔍 DEBUG: Skipping duplicate URL: {url}")
                 continue
                 
             try:
@@ -113,7 +122,7 @@ async def monitor_channel_messages(client, message):
                 
                 # Extract product context for better logging
                 context = extract_product_context(text_content, url)
-                logger.info(f"📋 Context: {context[:100]}...")
+                logger.info(f"🔍 DEBUG: Context: {context[:100]}...")
                 
                 payload = {
                     "url": url,
@@ -122,10 +131,11 @@ async def monitor_channel_messages(client, message):
                     "channel_info": message_data["channel_info"]
                 }
                 
-                logger.info(f"📤 Sending {url} to API from {channel_title}")
+                logger.info(f"🔍 DEBUG: Sending payload to API: {payload}")
                 
                 # API call with retry logic
                 response = await token_bot_api.process_amazon_link(payload)
+                logger.info(f"🔍 DEBUG: API response: {response}")
                 
                 if response and response.get("status") == "success":
                     logger.info(f"✅ SUCCESS: {url} from {channel_title}")
@@ -136,6 +146,8 @@ async def monitor_channel_messages(client, message):
                     
             except Exception as e:
                 logger.error(f"❌ Error processing {url} from {channel_title}: {e}")
+                import traceback
+                logger.error(f"❌ Traceback: {traceback.format_exc()}")
                 
     except Exception as e:
         logger.error(f"❌ Monitor error: {e}")
