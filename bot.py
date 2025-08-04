@@ -1,37 +1,35 @@
+import os
 from pyrogram import Client
 from config import Config
-from flask import Flask
-import threading
-import os
 
-# Flask app for Render hosting
-app = Flask(__name__)
-
-@app.route('/')
-def health_check():
-    return "Amazon Monitor Bot is running! 🤖", 200
-
-def run_flask_app():
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host="0.0.0.0", port=port)
-
-# Pyrogram client
-client = Client(
-    ":memory:",
-    api_id=Config.API_ID,
-    api_hash=Config.API_HASH,
-    session_string=Config.STRING_SESSION,
-    phone_number=Config.PHONE_NUMBER,
-    plugins=dict(root="plugins"),
-    workers=5,
-    in_memory=True
-)
+def create_pyrogram_client():
+    """Pyrogram client ko create karne ke liye helper function"""
+    try:
+        # Client ko memory-based session ke saath initialize karein
+        # Pyrogram ka session string Env var se aayega
+        client = Client(
+            name=":memory:",
+            api_id=Config.API_ID,
+            api_hash=Config.API_HASH,
+            session_string=Config.STRING_SESSION,
+            phone_number=Config.PHONE_NUMBER,
+            plugins=dict(root="plugins"),
+            workers=5,
+            in_memory=True
+        )
+        return client
+    except Exception as e:
+        print(f"❌ Pyrogram client ko initialize karne mein error: {e}")
+        return None
 
 if __name__ == "__main__":
-    # Start Flask in separate thread
-    flask_thread = threading.Thread(target=run_flask_app)
-    flask_thread.start()
-    
-    # Start Pyrogram client
     print("🚀 Amazon Monitor Bot Starting...")
-    client.run()
+    
+    # Client banayein
+    pyrogram_client = create_pyrogram_client()
+    
+    if pyrogram_client:
+        # Client run karein
+        pyrogram_client.run()
+    else:
+        print("❌ Client initialization failed. Exiting.")
