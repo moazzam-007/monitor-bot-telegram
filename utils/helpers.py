@@ -1,19 +1,35 @@
 import re
 import logging
 from datetime import datetime
+from urllib.parse import urlparse, parse_qs, urlunparse
 
 logger = logging.getLogger(__name__)
 
 def clean_url(url):
     """Clean and normalize URL"""
-    # Remove extra spaces and characters
-    url = url.strip()
-    
-    # Remove query parameters that might interfere
-    unwanted_params = ['ref_', 'tag', 'psc', 'qid']
-    
-    # Basic cleaning for logging/comparison
-    return url
+    try:
+        # Remove extra spaces and characters
+        url = url.strip()
+        
+        # Parse the URL
+        parsed = urlparse(url)
+        
+        # Remove query parameters that might interfere
+        # We'll keep only the path and remove the query and fragment
+        cleaned = urlunparse((
+            parsed.scheme,
+            parsed.netloc,
+            parsed.path,
+            None,
+            None,
+            None
+        ))
+        
+        return cleaned
+        
+    except Exception as e:
+        logger.error(f"Error cleaning URL: {e}")
+        return url
 
 def extract_product_context(text, url):
     """Extract context around the product URL"""
@@ -47,3 +63,9 @@ def validate_channel_id(channel_id):
         return channel_int < 0
     except (ValueError, TypeError):
         return False
+
+def extract_asin_from_url(url):
+    """Extract ASIN from Amazon URL"""
+    asin_pattern = r'/dp/([A-Z0-9]{10})'
+    match = re.search(asin_pattern, url)
+    return match.group(1) if match else None
