@@ -1,0 +1,27 @@
+services:
+  - type: worker
+    name: amazon-monitor-bot
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python bot.py
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: API_ID
+        sync: false
+      - key: API_HASH
+        sync: false
+      - key: PHONE_NUMBER
+        sync: false
+      - key: STRING_SESSION
+        sync: false
+      - key: CHANNELS
+        sync: false
+      - key: TOKEN_BOT_API_URL
+        sync: false
+      - key: API_TIMEOUT
+        value: 30
+      - key: LOG_GROUP_ID
+        sync: false
+      - key: DEBUG_MODE
+        value: false
