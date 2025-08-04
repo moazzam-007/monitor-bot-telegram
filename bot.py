@@ -1,6 +1,11 @@
 import os
+import logging
 from pyrogram import Client
 from config import Config
+
+# Setup logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 def create_pyrogram_client():
     """Pyrogram client ko create karne ke liye helper function"""
@@ -19,11 +24,15 @@ def create_pyrogram_client():
         )
         return client
     except Exception as e:
-        print(f"❌ Pyrogram client ko initialize karne mein error: {e}")
+        logger.error(f"❌ Pyrogram client ko initialize karne mein error: {e}")
         return None
 
 if __name__ == "__main__":
     print("🚀 Amazon Monitor Bot Starting...")
+    
+    # Log configuration
+    logger.info(f"🔧 Configured channels: {Config.CHANNELS}")
+    logger.info(f"🔧 API URL: {Config.TOKEN_BOT_API_URL}")
     
     # Client banayein
     pyrogram_client = create_pyrogram_client()
@@ -32,4 +41,4 @@ if __name__ == "__main__":
         # Client run karein
         pyrogram_client.run()
     else:
-        print("❌ Client initialization failed. Exiting.")
+        logger.error("❌ Client initialization failed. Exiting.")
