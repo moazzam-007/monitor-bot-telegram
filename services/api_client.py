@@ -8,7 +8,8 @@ logger = logging.getLogger(__name__)
 class TokenBotAPI:
     def __init__(self):
         self.api_url = Config.TOKEN_BOT_API_URL
-        self.timeout = Config.API_TIMEOUT
+        # Aiohttp timeout should be an object, not just an integer
+        self.timeout = aiohttp.ClientTimeout(total=Config.API_TIMEOUT)
 
     async def process_amazon_link(self, payload, max_retries=3, delay=5):
         """Send Amazon link to Token Bot for processing with retry logic"""
@@ -18,11 +19,10 @@ class TokenBotAPI:
 
         for attempt in range(max_retries):
             try:
-                async with aiohttp.ClientSession() as session:
+                async with aiohttp.ClientSession(timeout=self.timeout) as session:
                     async with session.post(
                         self.api_url,
-                        json=payload,
-                        timeout=self.timeout
+                        json=payload
                     ) as response:
                         if response.status == 200:
                             result = await response.json()
@@ -49,10 +49,9 @@ class TokenBotAPI:
         
         try:
             health_url = self.api_url.replace('/api/process', '/health')
-            async with aiohttp.ClientSession() as session:
+            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10)) as session:
                 async with session.get(
-                    health_url,
-                    timeout=aiohttp.ClientTimeout(total=10)
+                    health_url
                 ) as response:
                     return response.status == 200
                     
