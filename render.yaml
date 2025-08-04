@@ -1,5 +1,5 @@
 services:
-  - type: worker
+  - type: web
     name: amazon-monitor-bot
     env: python
     buildCommand: pip install -r requirements.txt
@@ -20,7 +20,7 @@ services:
       - key: TOKEN_BOT_API_URL
         sync: false
       - key: API_TIMEOUT
-        value: 30
+        value: 60
       - key: LOG_GROUP_ID
         sync: false
       - key: DEBUG_MODE
