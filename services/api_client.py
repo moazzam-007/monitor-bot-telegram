@@ -29,7 +29,9 @@ class TokenBotAPI:
                     ) as response:
                         logger.info(f"🔍 DEBUG: API Response status: {response.status}")
                         
-                        if response.status == 200:
+                        # === YEH LINE BADLI GAYI HAI ===
+                        # Ab yeh 200 (OK) aur 202 (Accepted) dono ko success manega
+                        if response.status in [200, 202]: 
                             result = await response.json()
                             logger.info(f"🔍 DEBUG: API Response: {result}")
                             return result
