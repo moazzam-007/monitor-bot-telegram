@@ -3,7 +3,7 @@ services:
     name: amazon-monitor-bot
     env: python
     buildCommand: pip install -r requirements.txt
-    startCommand: python bot.py
+    startCommand: gunicorn --workers 1 --threads 4 bot:app
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.9
