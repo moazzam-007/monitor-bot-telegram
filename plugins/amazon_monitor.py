@@ -2,7 +2,7 @@ import asyncio
 from pyrogram import Client, filters
 from config import Config
 from services.api_client import TokenBotAPI
-from services.duplicate_detector import DuplicateDetector 
+from services.duplicate_detector import DuplicateDetector
 import re
 import logging
 from utils.helpers import clean_url, extract_product_context
@@ -53,15 +53,17 @@ def extract_message_data(message):
         }
     }
     
-    # Extract images - enhanced to handle multiple images better
+    # === YEH LOGIC THEEK KI GAYI HAI ===
+    # Ab yeh single photo ko bhi safely handle karega
     if message.photo:
-        # Get the highest resolution photo
-        photo = message.photo[-1]  # The last photo is the highest resolution
-        if hasattr(photo, 'file_id') and photo.file_id:
+        # Direct access to file_id is safer than using an index,
+        # as message.photo is not always a list.
+        if hasattr(message.photo, 'file_id') and message.photo.file_id:
             data["images"].append({
-                "file_id": photo.file_id,
-                "file_size": getattr(photo, 'file_size', 0)
+                "file_id": message.photo.file_id,
+                "file_size": getattr(message.photo, 'file_size', 0)
             })
+    # ====================================
     
     # Handle media groups (multiple images)
     if message.media_group_id:
@@ -72,6 +74,7 @@ def extract_message_data(message):
     return data
 
 # Create a filter for the configured channels
+# This correctly converts string IDs from config to integers
 channel_filters = filters.chat(list(map(int, Config.CHANNELS)))
 
 @Client.on_message(channel_filters)
@@ -118,6 +121,7 @@ async def monitor_channel_messages(client, message):
                 continue
                 
             try:
+                # This function will now work correctly for photo messages
                 message_data = extract_message_data(message)
                 
                 # Extract product context for better logging
