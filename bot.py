@@ -14,7 +14,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Create Flask app for health checks
+# Flask app ko 'app' naam se banayein, yeh standard hai
 app = Flask(__name__)
 
 # Global variable to store monitor bot status
@@ -30,12 +30,6 @@ def create_pyrogram_client():
     """Pyrogram client ko create karne ke liye helper function"""
     try:
         logger.info("🚀 Creating Pyrogram client...")
-        logger.info(f"🔧 API_ID: {Config.API_ID}")
-        logger.info(f"🔧 API_HASH: {'*' * len(Config.API_HASH)}")
-        logger.info(f"🔧 PHONE_NUMBER: {Config.PHONE_NUMBER}")
-        logger.info(f"🔧 CHANNELS: {Config.CHANNELS}")
-        logger.info(f"🔧 API_URL: {Config.TOKEN_BOT_API_URL}")
-        
         client = Client(
             name=":memory:",
             api_id=Config.API_ID,
@@ -49,15 +43,13 @@ def create_pyrogram_client():
         logger.info("✅ Pyrogram client created successfully")
         return client
     except Exception as e:
-        logger.error(f"❌ Error creating Pyrogram client: {e}")
+        logger.error(f"❌ Error creating Pyrogram client: {e}", exc_info=True)
         return None
 
 async def run_monitor_bot_async():
     """Run the monitor bot asynchronously"""
     try:
         logger.info("🚀 Starting monitor bot asynchronously...")
-        
-        # Client banayein
         pyrogram_client = create_pyrogram_client()
         
         if pyrogram_client:
@@ -67,31 +59,38 @@ async def run_monitor_bot_async():
             
             logger.info("✅ Starting monitor bot client...")
             await pyrogram_client.start()
+            # Bot ko chalta rakhne ke liye
+            await asyncio.Future() 
         else:
             logger.error("❌ Client initialization failed.")
             monitor_bot_status["running"] = False
             
     except Exception as e:
-        logger.error(f"❌ Monitor bot error: {e}")
+        logger.error(f"❌ Monitor bot async error: {e}", exc_info=True)
         monitor_bot_status["running"] = False
 
-def run_monitor_bot():
+def run_monitor_bot_in_thread():
     """Run the monitor bot in background with event loop"""
     try:
-        logger.info("🚀 Starting monitor bot in background...")
-        
-        # Create a new event loop for this thread
+        logger.info("🚀 Preparing background thread for monitor bot...")
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-        
-        # Run the async function
         loop.run_until_complete(run_monitor_bot_async())
-        
     except Exception as e:
-        logger.error(f"❌ Monitor bot thread error: {e}")
+        logger.error(f"❌ Monitor bot thread error: {e}", exc_info=True)
         monitor_bot_status["running"] = False
 
-# Flask routes
+# === YEH WOH LOGIC HAI JISE HUMNE BAHAR NIKALA HAI ===
+# Yeh code Gunicorn ke import karte hi chal jayega
+logger.info("🚀 Initializing application...")
+monitor_thread = threading.Thread(target=run_monitor_bot_in_thread, daemon=True)
+monitor_thread.start()
+logger.info("✅ Monitor bot background thread has been started.")
+# ========================================================
+
+
+# --- Flask Routes ---
+# Baki ke Flask routes (@app.route) waise hi rahenge
 @app.route('/')
 def home():
     """Home route for health check"""
@@ -99,65 +98,18 @@ def home():
     return jsonify({
         "service": "Amazon Monitor Bot",
         "status": "running" if monitor_bot_status["running"] else "stopped",
-        "telegram_connected": monitor_bot_status["telegram_connected"],
-        "channels_monitored": monitor_bot_status["channels_monitored"],
-        "links_processed": monitor_bot_status["links_processed"],
-        "last_check": monitor_bot_status["last_check"]
-    })
-
-@app.route('/health')
-def health():
-    """Health check endpoint"""
-    monitor_bot_status["last_check"] = time.time()
-    return jsonify({
-        "status": "healthy" if monitor_bot_status["running"] else "unhealthy",
-        "telegram_connected": monitor_bot_status["telegram_connected"],
-        "channels": len(Config.CHANNELS),
-        "uptime": monitor_bot_status["last_check"]
+        "telegram_connected": monitor_bot_status["telegram_connected"]
     })
 
 @app.route('/status')
 def status():
     """Detailed status endpoint"""
-    monitor_bot_status["last_check"] = time.time()
-    return jsonify({
-        "bot_status": "running" if monitor_bot_status["running"] else "stopped",
-        "telegram_connected": monitor_bot_status["telegram_connected"],
-        "channels_monitored": monitor_bot_status["channels_monitored"],
-        "links_processed": monitor_bot_status["links_processed"],
-        "api_url": Config.TOKEN_BOT_API_URL,
-        "last_check": monitor_bot_status["last_check"]
-    })
+    return jsonify(monitor_bot_status)
 
+
+# Yeh block sirf local testing ke liye hai. Render isay use nahi karega.
 if __name__ == "__main__":
-    try:
-        print("🚀 Amazon Monitor Bot Starting...")
-        logger.info("🚀 Amazon Monitor Bot Starting...")
-        
-        # Log all environment variables (without sensitive data)
-        logger.info("🔧 Environment Variables:")
-        logger.info(f"  - API_ID: {os.environ.get('API_ID', 'NOT SET')}")
-        logger.info(f"  - API_HASH: {'SET' if os.environ.get('API_HASH') else 'NOT SET'}")
-        logger.info(f"  - PHONE_NUMBER: {os.environ.get('PHONE_NUMBER', 'NOT SET')}")
-        logger.info(f"  - STRING_SESSION: {'SET' if os.environ.get('STRING_SESSION') else 'NOT SET'}")
-        logger.info(f"  - CHANNELS: {os.environ.get('CHANNELS', 'NOT SET')}")
-        logger.info(f"  - TOKEN_BOT_API_URL: {os.environ.get('TOKEN_BOT_API_URL', 'NOT SET')}")
-        
-        # Start monitor bot in background thread
-        monitor_thread = threading.Thread(target=run_monitor_bot, daemon=True)
-        monitor_thread.start()
-        logger.info("✅ Monitor bot started in background thread")
-        
-        # Give the monitor bot time to start
-        time.sleep(5)
-        
-        # Get the port from environment variable
-        port = int(os.environ.get('PORT', 5000))
-        logger.info(f"🌐 Starting Flask app on port {port}")
-        
-        # Run Flask app
-        app.run(host='0.0.0.0', port=port, debug=False)
-        
-    except Exception as e:
-        logger.error(f"❌ Fatal error: {e}")
-        print(f"❌ Fatal error: {e}")
+    logger.info("Running in local development mode. Do not use for production.")
+    # Local machine par chalane ke liye, Gunicorn ki zaroorat nahi
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=True)
