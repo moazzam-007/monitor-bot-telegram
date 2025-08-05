@@ -6,7 +6,6 @@ import asyncio
 from flask import Flask, jsonify
 from pyrogram import Client
 from config import Config
-# === NAYA IMPORT ===
 from plugins.amazon_monitor import periodic_checker
 
 # Setup logging
@@ -16,16 +15,14 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Flask app ko 'app' naam se banayein, yeh standard hai
 app = Flask(__name__)
 
-# Global variable to store monitor bot status (No Change)
+# Global variable to store monitor bot status
 monitor_bot_status = {
     "running": False, "last_check": None, "telegram_connected": False,
     "channels_monitored": 0, "links_processed": 0
 }
 
-# create_pyrogram_client function (No Change)
 def create_pyrogram_client():
     try:
         logger.info("🚀 Creating Pyrogram client...")
@@ -51,16 +48,28 @@ async def run_monitor_bot_async():
             monitor_bot_status["telegram_connected"] = True
             monitor_bot_status["channels_monitored"] = len(Config.CHANNELS)
             
+            # === NAYI LOGIC YAHAN ADD KI GAYI HAI ===
+            # Client start karne se pehle, sabhi channels ko join/access karein
+            logger.info("Ensuring access to all configured channels (warming up cache)...")
+            channel_ids = list(map(int, Config.CHANNELS))
+            for channel_id in channel_ids:
+                try:
+                    # Yeh command channel ki details cache mein save kar dega
+                    await pyrogram_client.join_chat(channel_id)
+                    logger.info(f"✅ Access confirmed for channel: {channel_id}")
+                    await asyncio.sleep(2) # Rate limit se bachne ke liye thora delay
+                except Exception as e:
+                    logger.error(f"❌ Could not join/access channel {channel_id}: {e}")
+            logger.info("✅ All channels have been warmed up.")
+            # ==========================================
+
             logger.info("✅ Starting monitor bot client...")
             await pyrogram_client.start()
 
-            # === YEH NAYI LINE ADD KI GAYI HAI ===
-            # Pyrogram client start hone ke baad, poller ko background mein start karein
             logger.info("🚀 Starting active poller for public channels in background...")
             asyncio.create_task(periodic_checker(pyrogram_client))
-            # ====================================
 
-            await asyncio.Future()  # Bot ko hamesha chalta rakhne ke liye
+            await asyncio.Future()
         else:
             logger.error("❌ Client initialization failed.")
             monitor_bot_status["running"] = False
@@ -69,7 +78,7 @@ async def run_monitor_bot_async():
         logger.error(f"❌ Monitor bot async error: {e}", exc_info=True)
         monitor_bot_status["running"] = False
 
-# run_monitor_bot_in_thread function (No Change)
+# (Baki ka poora code bilkul waisa hi rahega)
 def run_monitor_bot_in_thread():
     try:
         logger.info("🚀 Preparing background thread for monitor bot...")
@@ -80,7 +89,6 @@ def run_monitor_bot_in_thread():
         logger.error(f"❌ Monitor bot thread error: {e}", exc_info=True)
         monitor_bot_status["running"] = False
 
-# --- Startup Logic and Flask Routes (No Change) ---
 logger.info("🚀 Initializing application...")
 monitor_thread = threading.Thread(target=run_monitor_bot_in_thread, daemon=True)
 monitor_thread.start()
