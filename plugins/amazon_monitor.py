@@ -97,7 +97,7 @@ async def monitor_channel_messages(client, message):
 
 # --- Active Polling Logic ---
 async def periodic_checker(client: Client):
-    """Har 60 seconds mein sabhi channels ke aakhri 10 messages check karta hai."""
+    """Har 4 minute mein sabhi channels ke aakhri 10 messages check karta hai."""
     logger.info("✅ Active Polling service started in background.")
     while True:
         try:
@@ -112,9 +112,10 @@ async def periodic_checker(client: Client):
                     logger.warning(f"⚠️ Could not poll channel {channel_id}. Reason: {e}. Skipping to next channel.")
                     continue
             
-            logger.info("... Polling cycle complete. Waiting for 60 seconds ...")
-            await asyncio.sleep(60)
+            logger.info("... Polling cycle complete. Waiting for 4 minutes ...")
+            # === YEH LINE UPDATE KI GAYI HAI ===
+            await asyncio.sleep(240)
 
         except Exception as e:
             logger.error(f"❌ Critical error in periodic_checker main loop: {e}", exc_info=True)
-            await asyncio.sleep(60)
+            await asyncio.sleep(60) # Agar koi bara error aaye to 60 second baad hi try karein
