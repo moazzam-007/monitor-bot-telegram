@@ -1,4 +1,4 @@
-# file: config.py (FINAL BEST VERSION)
+# file: config.py (FINAL-FINAL-CORRECTED VERSION)
 import os
 from dotenv import load_dotenv
 
@@ -23,6 +23,11 @@ class Config:
 
     # Polling Configuration
     POLLING_MESSAGE_LIMIT = int(os.getenv('POLLING_MESSAGE_LIMIT', '20'))
+    
+    # === YEH LINE MISSING THI ===
+    # API call ke liye timeout (seconds mein)
+    API_TIMEOUT = int(os.getenv("API_TIMEOUT", "30"))
+
 
 # Validation
 required_vars = [
@@ -32,13 +37,11 @@ required_vars = [
     "STRING_SESSION",
     "CHANNELS",
     "TOKEN_BOT_API_URL",
-    "EARNKARO_BOT_USERNAME" # Ise bhi validation mein add kar diya hai
+    "EARNKARO_BOT_USERNAME"
 ]
 
-# Note: API_ID ko integer mein neeche convert karenge taake validation pehle ho jaye
 if any(not os.getenv(var) for var in required_vars):
     missing = [var for var in required_vars if not os.getenv(var)]
     raise ValueError(f"Missing required environment variables: {', '.join(missing)}")
 
-# Ab jab humein pata hai ke API_ID mojood hai, to use integer banayein
 Config.API_ID = int(Config.API_ID)
