@@ -1,49 +1,44 @@
+# file: config.py (FINAL BEST VERSION)
 import os
-import logging
+from dotenv import load_dotenv
 
-logger = logging.getLogger(__name__)
+load_dotenv()
 
 class Config:
-    # Telegram Configuration
-    API_ID = int(os.environ.get("API_ID"))
-    API_HASH = os.environ.get("API_HASH")
-    PHONE_NUMBER = os.environ.get("PHONE_NUMBER")
-    STRING_SESSION = os.environ.get("STRING_SESSION")
+    # Telegram User Account Configuration
+    API_ID = os.getenv("API_ID")
+    API_HASH = os.getenv("API_HASH")
+    PHONE_NUMBER = os.getenv("PHONE_NUMBER")
+    STRING_SESSION = os.getenv("STRING_SESSION")
     
     # Monitoring Configuration
-    CHANNELS_STR = os.environ.get("CHANNELS", "")
+    CHANNELS_STR = os.getenv("CHANNELS", "")
     CHANNELS = [x.strip() for x in CHANNELS_STR.split(',') if x.strip()]
     
-    # Token Bot API Configuration
-    TOKEN_BOT_API_URL = os.environ.get("TOKEN_BOT_API_URL")
-    API_TIMEOUT = int(os.environ.get("API_TIMEOUT", "30"))
+    # API URL for your Logic Bot
+    TOKEN_BOT_API_URL = os.getenv("TOKEN_BOT_API_URL")
     
-    # EarnKaro Bot Configuration (yeh humne pehle discuss kiya tha, isay bhi add kar lein)
-    EARNKARO_BOT_USERNAME = os.getenv('EARNKARO_BOT_USERNAME', 'EarnKaroBot')
-    
-    # Logging Configuration
-    LOG_GROUP_ID = os.environ.get("LOG_GROUP_ID")
-    
-    # Debug Mode
-    DEBUG_MODE = os.environ.get("DEBUG_MODE", "False").lower() == "true"
+    # EarnKaro Bot Username
+    EARNKARO_BOT_USERNAME = os.getenv('EARNKARO_BOT_USERNAME')
 
-    # === YEH NAYI LINE ADD KI GAYI HAI ===
-    # Har channel se ek baar mein kitne message check karne hain
+    # Polling Configuration
     POLLING_MESSAGE_LIMIT = int(os.getenv('POLLING_MESSAGE_LIMIT', '20'))
 
-# Validate required environment variables
+# Validation
 required_vars = [
     "API_ID",
     "API_HASH",
     "PHONE_NUMBER",
     "STRING_SESSION",
     "CHANNELS",
-    "TOKEN_BOT_API_URL"
+    "TOKEN_BOT_API_URL",
+    "EARNKARO_BOT_USERNAME" # Ise bhi validation mein add kar diya hai
 ]
 
-missing_vars = [var for var in required_vars if not os.environ.get(var)]
-if missing_vars:
-    logger.error(f"❌ Missing required environment variables: {', '.join(missing_vars)}")
-    raise ValueError(f"Missing required environment variables: {', '.join(missing_vars)}")
+# Note: API_ID ko integer mein neeche convert karenge taake validation pehle ho jaye
+if any(not os.getenv(var) for var in required_vars):
+    missing = [var for var in required_vars if not os.getenv(var)]
+    raise ValueError(f"Missing required environment variables: {', '.join(missing)}")
 
-logger.info("✅ All required environment variables are set")
+# Ab jab humein pata hai ke API_ID mojood hai, to use integer banayein
+Config.API_ID = int(Config.API_ID)
