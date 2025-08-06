@@ -18,11 +18,18 @@ class Config:
     TOKEN_BOT_API_URL = os.environ.get("TOKEN_BOT_API_URL")
     API_TIMEOUT = int(os.environ.get("API_TIMEOUT", "30"))
     
+    # EarnKaro Bot Configuration (yeh humne pehle discuss kiya tha, isay bhi add kar lein)
+    EARNKARO_BOT_USERNAME = os.getenv('EARNKARO_BOT_USERNAME', 'EarnKaroBot')
+    
     # Logging Configuration
     LOG_GROUP_ID = os.environ.get("LOG_GROUP_ID")
     
     # Debug Mode
     DEBUG_MODE = os.environ.get("DEBUG_MODE", "False").lower() == "true"
+
+    # === YEH NAYI LINE ADD KI GAYI HAI ===
+    # Har channel se ek baar mein kitne message check karne hain
+    POLLING_MESSAGE_LIMIT = int(os.getenv('POLLING_MESSAGE_LIMIT', '20'))
 
 # Validate required environment variables
 required_vars = [
