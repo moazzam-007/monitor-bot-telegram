@@ -1,4 +1,4 @@
-# plugins/amazon_monitor.py (FINAL - STARTING POINT LOGIC)
+# file: plugins/amazon_monitor.py
 import asyncio
 from pyrogram import Client, filters
 from config import Config
@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 token_bot_api = TokenBotAPI()
 duplicate_detector = DuplicateDetector(time_window_hours=48)
 
-# === NAYI "STARTING POINT" MEMORY ===
+# === "STARTING POINT" MEMORY ===
 # Yeh dictionary startup par `bot.py` se fill hogi
 last_message_ids = {} # Format: {channel_id: message_id}
 
@@ -46,7 +46,7 @@ async def process_message_logic(client, message):
         if message.id <= last_message_ids.get(channel_id, 0):
             return # Agar purana message hai to ignore karein
 
-        # Naye message ki ID ko foran update karein
+        # Naye message ki ID ko foran memory mein update karein
         last_message_ids[channel_id] = message.id
         
         text_content = message.caption or message.text or ""
@@ -88,13 +88,13 @@ async def periodic_checker(client: Client):
 
             for channel_id in channel_ids:
                 try:
-                    async for message in client.get_chat_history(chat_id=channel_id, limit=20):
+                    async for message in client.get_chat_history(chat_id=channel_id, limit=Config.POLLING_MESSAGE_LIMIT):
                         await process_message_logic(client, message)
                 except Exception as e:
                     logger.warning(f"⚠️ Could not poll channel {channel_id}. Reason: {e}. Skipping.")
                     continue
             
-            logger.info("... Polling cycle complete. Waiting for 4 minutes ...")
+            logger.info(f"... Polling cycle complete. Waiting for 4 minutes ...")
             await asyncio.sleep(240)
         except Exception as e:
             logger.error(f"❌ Critical error in periodic_checker: {e}", exc_info=True)
