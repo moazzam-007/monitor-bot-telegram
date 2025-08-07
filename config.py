@@ -17,6 +17,8 @@ class Config:
     
     # API URL for your Logic Bot
     TOKEN_BOT_API_URL = os.getenv("TOKEN_BOT_API_URL")
+    EXTRAPE_BOT_USERNAME = os.getenv('EXTRAPE_BOT_USERNAME')
+    
     
     # EarnKaro Bot Username
     EARNKARO_BOT_USERNAME = os.getenv('EARNKARO_BOT_USERNAME')
