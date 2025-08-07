@@ -1,4 +1,4 @@
-# file: plugins/amazon_monitor.py
+# plugins/amazon_monitor.py (FINAL COMPLETE CODE)
 import asyncio
 from pyrogram import Client, filters
 from config import Config
@@ -12,16 +12,15 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(level
 logger = logging.getLogger(__name__)
 token_bot_api = TokenBotAPI()
 duplicate_detector = DuplicateDetector(time_window_hours=48)
-
-# === "STARTING POINT" MEMORY ===
-# Yeh dictionary startup par `bot.py` se fill hogi
-last_message_ids = {} # Format: {channel_id: message_id}
+last_message_ids = {} # "Starting Point" Memory
 
 # --- Helper Functions ---
 def clean_url(url):
+    """Clean and normalize URL by removing query parameters."""
     return url.split('?')[0]
 
 def extract_message_data(message):
+    """Extracts relevant data from a message object."""
     data = {
         "text": message.caption or message.text or "", "images": [],
         "channel_info": {"channel_id": message.chat.id, "message_id": message.id, "channel_title": getattr(message.chat, 'title', 'Unknown')}
@@ -32,60 +31,78 @@ def extract_message_data(message):
     return data
 
 def is_amazon_url(url):
+    """Checks if a given URL is from Amazon."""
     amazon_patterns = [r'https?://(?:www\.)?amazon\.', r'https?://amzn\.to', r'https?://a\.co']
     for pattern in amazon_patterns:
         if re.search(pattern, url, re.IGNORECASE):
             return True
     return False
 
-# --- Core Logic Function ---
+# --- Core Logic Function (Updated with Smart Forwarding) ---
 async def process_message_logic(client, message):
+    """Processes a single message, routing it smartly."""
     try:
         channel_id = message.chat.id
-        # Check karein ke message humare "starting point" se naya hai ya nahi
         if message.id <= last_message_ids.get(channel_id, 0):
-            return # Agar purana message hai to ignore karein
+            return
 
-        # Naye message ki ID ko foran memory mein update karein
         last_message_ids[channel_id] = message.id
         
         text_content = message.caption or message.text or ""
         if not text_content: return
-        all_urls = re.findall(r'https?://[^\s]+', text_content, re.IGNORECASE)
-        if not all_urls: return
         
-        for url in all_urls:
-            if duplicate_detector.is_duplicate(clean_url(url)):
-                continue
+        all_urls = list(set(re.findall(r'https?://[^\s]+', text_content, re.IGNORECASE))) # Get unique URLs
+        if not all_urls: return
 
-            if is_amazon_url(url):
-                message_data = extract_message_data(message)
-                payload = {"url": url, "original_text": message_data["text"], "images": message_data["images"], "channel_info": message_data["channel_info"]}
-                await token_bot_api.process_amazon_link(payload)
-            else:
+        # --- SMART ROUTING LOGIC ---
+        has_non_amazon_link = any(not is_amazon_url(url) for url in all_urls)
+
+        if has_non_amazon_link:
+            # If even one non-Amazon link exists, treat the whole message as a non-Amazon deal
+            # and forward it ONCE to EarnKaro after a duplicate check.
+            if not duplicate_detector.is_duplicate(clean_url(text_content)): # Duplicate check on whole message
+                logger.info(f"✅ Non-Amazon message found. Forwarding message {message.id} to EarnKaro Bot.")
                 try:
-                    await client.forward_messages(chat_id=Config.EARNKARO_BOT_USERNAME, from_chat_id=channel_id, message_ids=message.id)
+                    await client.forward_messages(
+                        chat_id=Config.EARNKARO_BOT_USERNAME,
+                        from_chat_id=channel_id,
+                        message_ids=message.id
+                    )
                     await asyncio.sleep(3)
                 except Exception as e:
                     logger.error(f"❌ Failed to forward message {message.id} to EarnKaro: {e}")
+            else:
+                logger.info(f"🔄 Skipping duplicate non-Amazon message forwarding for message ID: {message.id}")
+            return # End processing for this message here.
+
+        # If the code reaches here, it means ALL links in the message are Amazon links.
+        for url in all_urls:
+            if duplicate_detector.is_duplicate(clean_url(url)):
+                continue
+            
+            logger.info(f"✅ Amazon link found. Processing with Logic Bot: {url}")
+            message_data = extract_message_data(message)
+            payload = {"url": url, "original_text": message_data["text"], "images": message_data["images"], "channel_info": message_data["channel_info"]}
+            await token_bot_api.process_amazon_link(payload)
 
     except Exception as e:
         logger.error(f"❌ Error in process_message_logic for message {message.id}: {e}", exc_info=True)
 
-# --- Real-time Message Handler ---
+
+# --- Real-time Handler and Poller ---
 channel_filters = filters.chat(list(map(int, Config.CHANNELS)))
 @Client.on_message(channel_filters)
 async def monitor_channel_messages(client, message):
+    """Handles real-time updates."""
     await process_message_logic(client, message)
 
-# --- Active Polling Logic ---
 async def periodic_checker(client: Client):
+    """Periodically polls channels for missed messages."""
     logger.info("✅ Active Polling service started.")
     while True:
         try:
             logger.info("... Polling all channels for new messages ...")
             channel_ids = list(map(int, Config.CHANNELS))
-
             for channel_id in channel_ids:
                 try:
                     async for message in client.get_chat_history(chat_id=channel_id, limit=Config.POLLING_MESSAGE_LIMIT):
@@ -93,7 +110,6 @@ async def periodic_checker(client: Client):
                 except Exception as e:
                     logger.warning(f"⚠️ Could not poll channel {channel_id}. Reason: {e}. Skipping.")
                     continue
-            
             logger.info(f"... Polling cycle complete. Waiting for 4 minutes ...")
             await asyncio.sleep(240)
         except Exception as e:
