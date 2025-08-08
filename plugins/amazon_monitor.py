@@ -1,4 +1,4 @@
-# plugins/amazon_monitor.py (FINAL CORRECTED VERSION)
+# plugins/amazon_monitor.py (FINAL & COMPLETE)
 import asyncio
 from pyrogram import Client, filters
 from config import Config
@@ -35,7 +35,7 @@ def is_amazon_url(url):
             return True
     return False
 
-# --- Core Logic Function ---
+# --- Core Logic Function (Updated with all fixes) ---
 async def process_message_logic(client, message):
     try:
         channel_id = message.chat.id
@@ -49,25 +49,39 @@ async def process_message_logic(client, message):
         
         all_urls = list(set(re.findall(r'https?://[^\s]+', text_content, re.IGNORECASE)))
         if not all_urls: return
-        
-        has_non_amazon_link = any(not is_amazon_url(url) for url in all_urls)
 
-        if has_non_amazon_link:
+        # --- SMART ROUTING & DUPLICATE CHECK LOGIC ---
+        
+        amazon_links_in_message = [url for url in all_urls if is_amazon_url(url)]
+        non_amazon_links_in_message = [url for url in all_urls if not is_amazon_url(url)]
+
+        # Case 1: Agar message mein non-Amazon links hain (chahe Amazon ho ya na ho)
+        if non_amazon_links_in_message:
+            # Poore message par duplicate check karein
             if not duplicate_detector.is_duplicate(clean_url(text_content)):
                 logger.info(f"✅ Non-Amazon message found. Forwarding message {message.id} to EarnKaro Bot once.")
                 try:
-                    await client.forward_messages(chat_id=Config.EARNKARO_BOT_USERNAME, from_chat_id=channel_id, message_ids=message.id)
+                    await client.forward_messages(
+                        chat_id=Config.EARNKARO_BOT_USERNAME,
+                        from_chat_id=channel_id,
+                        message_ids=message.id
+                    )
                     await asyncio.sleep(3)
                 except Exception as e:
                     logger.error(f"❌ Failed to forward message {message.id} to EarnKaro: {e}")
-            return
-        
-        elif all_urls: # Agar sirf Amazon links hain
-            for url in all_urls:
+            else:
+                logger.info(f"🔄 Skipping duplicate non-Amazon message forwarding for message ID: {message.id}")
+            return # Yahan function khatam kar dein
+
+        # Case 2: Agar message mein SIRF Amazon ke links hain
+        elif amazon_links_in_message:
+            logger.info(f"✅ Amazon-only message found. Processing each link individually.")
+            for url in amazon_links_in_message:
+                # Har Amazon link par alag se duplicate check karein
                 if duplicate_detector.is_duplicate(clean_url(url)):
+                    logger.info(f"🔄 Skipping duplicate Amazon URL: {url}")
                     continue
                 
-                logger.info(f"✅ Amazon link found. Processing with Logic Bot: {url}")
                 message_data = extract_message_data(message)
                 payload = {"url": url, "original_text": message_data["text"], "images": message_data["images"], "channel_info": message_data["channel_info"]}
                 await token_bot_api.process_amazon_link(payload)
@@ -75,14 +89,13 @@ async def process_message_logic(client, message):
     except Exception as e:
         logger.error(f"❌ Error in process_message_logic for message {message.id}: {e}", exc_info=True)
 
-# --- Real-time Message Handler ---
+
+# --- Real-time Handler and Poller (No Change) ---
 channel_filters = filters.chat(list(map(int, Config.CHANNELS)))
 @Client.on_message(channel_filters)
 async def monitor_channel_messages(client, message):
     await process_message_logic(client, message)
 
-# --- Active Polling Logic ---
-# === IS FUNCTION KA NAAM THEEK KIYA GAYA HAI ===
 async def periodic_checker(client: Client):
     logger.info("✅ Active Polling service started.")
     while True:
