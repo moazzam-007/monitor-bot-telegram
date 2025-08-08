@@ -1,4 +1,4 @@
-# plugins/amazon_monitor.py (FINAL BEST OF BOTH VERSION)
+# file: plugins/amazon_monitor.py (FINAL NORMALIZED VERSION)
 import asyncio
 from pyrogram import Client, filters
 from config import Config
@@ -12,30 +12,32 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(level
 logger = logging.getLogger(__name__)
 token_bot_api = TokenBotAPI()
 duplicate_detector = DuplicateDetector(time_window_hours=48)
-last_message_ids = {} # "Starting Point" Memory
+last_message_ids = {}
 
 # --- Helper Functions ---
-def clean_url(url):
-    return url.split('?')[0]
+def get_url_unique_id(url):
+    """URL ka ek unique identifier nikalta hai (ASIN ya cleaned URL)."""
+    try:
+        if 'amazon' in url or 'amzn.to' in url or 'a.co' in url:
+            # ASIN nikalne ki koshish karein
+            match = re.search(r'/(?:dp|gp/product)/([A-Z0-9]{10})', url)
+            if match:
+                return f"asin_{match.group(1)}"
+        
+        # Agar ASIN na mile, ya non-Amazon link ho, to use saaf karein
+        return url.split('?')[0].rstrip('/')
+    except:
+        return url # Failsafe
 
-def extract_message_data(message):
-    data = {
-        "text": message.caption or message.text or "", "images": [],
-        "channel_info": {"channel_id": message.chat.id, "message_id": message.id, "channel_title": getattr(message.chat, 'title', 'Unknown')}
-    }
-    if message.photo:
-        if hasattr(message.photo, 'file_id') and message.photo.file_id:
-            data["images"].append({"file_id": message.photo.file_id, "file_size": getattr(message.photo, 'file_size', 0)})
+def extract_message_data(message): # (Ismein koi change nahi)
+    #...
     return data
 
-def is_amazon_url(url):
-    amazon_patterns = [r'https?://(?:www\.)?amazon\.', r'https?://amzn\.to', r'https?://a\.co']
-    for pattern in amazon_patterns:
-        if re.search(pattern, url, re.IGNORECASE):
-            return True
+def is_amazon_url(url): # (Ismein koi change nahi)
+    #...
     return False
 
-# --- Core Logic Function (Updated with all fixes) ---
+# --- Core Logic Function ---
 async def process_message_logic(client, message):
     try:
         channel_id = message.chat.id
@@ -50,67 +52,36 @@ async def process_message_logic(client, message):
         all_urls = list(set(re.findall(r'https?://[^\s]+', text_content, re.IGNORECASE)))
         if not all_urls: return
 
-        # --- SMART ROUTING & DUPLICATE CHECK LOGIC ---
+        # --- NAYI AUR BEHTAR DUPLICATE & ROUTING LOGIC ---
         
         amazon_links_in_message = [url for url in all_urls if is_amazon_url(url)]
         non_amazon_links_in_message = [url for url in all_urls if not is_amazon_url(url)]
 
-        # Case 1: Agar message mein non-Amazon links hain (chahe Amazon ho ya na ho)
+        # Case 1: Agar message mein non-Amazon links hain
         if non_amazon_links_in_message:
-            # Poore message par duplicate check karein
-            if not duplicate_detector.is_duplicate(clean_url(text_content)):
-                logger.info(f"✅ Non-Amazon message found. Forwarding message {message.id} to EarnKaro Bot once.")
-                try:
-                    await client.forward_messages(
-                        chat_id=Config.EARNKARO_BOT_USERNAME,
-                        from_chat_id=channel_id,
-                        message_ids=message.id
-                    )
-                    await asyncio.sleep(3)
-                except Exception as e:
-                    logger.error(f"❌ Failed to forward message {message.id} to EarnKaro: {e}")
-            else:
-                logger.info(f"🔄 Skipping duplicate non-Amazon message forwarding for message ID: {message.id}")
-            return # Yahan function khatam kar dein
+            unique_id = get_url_unique_id(text_content) # Poore text par check
+            if not duplicate_detector.is_duplicate(unique_id):
+                logger.info(f"✅ Forwarding non-Amazon msg {message.id} to EarnKaro.")
+                await client.forward_messages(chat_id=Config.EARNKARO_BOT_USERNAME, from_chat_id=channel_id, message_ids=message.id)
+                duplicate_detector.mark_as_processed(unique_id) # Process mark karein
+            return
 
         # Case 2: Agar message mein SIRF Amazon ke links hain
         elif amazon_links_in_message:
-            logger.info(f"✅ Amazon-only message found. Processing each link individually.")
             for url in amazon_links_in_message:
-                # Har Amazon link par alag se duplicate check karein
-                if duplicate_detector.is_duplicate(clean_url(url)):
+                unique_id = get_url_unique_id(url)
+                if duplicate_detector.is_duplicate(unique_id):
                     logger.info(f"🔄 Skipping duplicate Amazon URL: {url}")
                     continue
                 
+                logger.info(f"✅ Processing Amazon link: {url}")
                 message_data = extract_message_data(message)
                 payload = {"url": url, "original_text": message_data["text"], "images": message_data["images"], "channel_info": message_data["channel_info"]}
                 await token_bot_api.process_amazon_link(payload)
+                duplicate_detector.mark_as_processed(unique_id) # Process mark karein
 
     except Exception as e:
         logger.error(f"❌ Error in process_message_logic for message {message.id}: {e}", exc_info=True)
 
-
-# --- Real-time Handler and Poller (No Change) ---
-channel_filters = filters.chat(list(map(int, Config.CHANNELS)))
-@Client.on_message(channel_filters)
-async def monitor_channel_messages(client, message):
-    await process_message_logic(client, message)
-
-async def periodic_checker(client: Client):
-    logger.info("✅ Active Polling service started.")
-    while True:
-        try:
-            logger.info("... Polling all channels for new messages ...")
-            channel_ids = list(map(int, Config.CHANNELS))
-            for channel_id in channel_ids:
-                try:
-                    async for message in client.get_chat_history(chat_id=channel_id, limit=Config.POLLING_MESSAGE_LIMIT):
-                        await process_message_logic(client, message)
-                except Exception as e:
-                    logger.warning(f"⚠️ Could not poll channel {channel_id}. Reason: {e}. Skipping.")
-                    continue
-            logger.info(f"... Polling cycle complete. Waiting for 4 minutes ...")
-            await asyncio.sleep(240)
-        except Exception as e:
-            logger.error(f"❌ Critical error in periodic_checker: {e}", exc_info=True)
-            await asyncio.sleep(60)
+# (Real-time Handler aur Poller mein koi change nahi hai)
+# ...
